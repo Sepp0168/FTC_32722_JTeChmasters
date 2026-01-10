@@ -20,7 +20,7 @@ public class Auto extends LinearOpMode{
         private long lastTime = 0;
         static final int TICKS_PER_REV = 28; // REV HD Hex Motor
         boolean QuietLaunch = false;
-        static final int goal_x = 125;
+        static final int goal_distance = 1;
         static final int goal_y = 100;
 
             
