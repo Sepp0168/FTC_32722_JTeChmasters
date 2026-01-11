@@ -113,7 +113,7 @@ public class Auto extends LinearOpMode{
         motorLaunch.setPower(0);
     }
     
-    public void correct(speed) {
+    public void correct(double speed) {
         boolean CorrectPos = false;
         while (!CorrectPos && opModeIsActive()) {
                 HuskyLens.Block[] blocks = husky.blocks();
