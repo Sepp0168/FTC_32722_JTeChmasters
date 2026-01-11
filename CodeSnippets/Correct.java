@@ -1,10 +1,4 @@
 public void correct(speed) {
-        static final double TAG_WIDTH_METERS = 0.165; // 16.5 cm
-        static final double FOCAL_LENGTH_PIXELS = 1212; // kalibreren!
-        static final double ANGLEMULT = ?; // kalibreren!
-        double angleRad;
-        double distance;
-        int DiaginalDistance;
         boolean CorrectPos = false;
         while (!CorrectPos && opModeIsActive()) {
                 HuskyLens.Block[] blocks = husky.blocks();
@@ -39,6 +33,11 @@ public void correct(speed) {
                     motorL.setPower(0);
                     if (angle >= 0.7) {
                         angle = 0.3;
+                        motorR.setPower(-1);
+                        motorL.setPower(1);
+                        sleep(500);
+                        motorR.setPower(0);
+                        motorL.setPower(0);
                     }
                     ServoHusky.setPosition(angle);
                     angle += 0.15;
