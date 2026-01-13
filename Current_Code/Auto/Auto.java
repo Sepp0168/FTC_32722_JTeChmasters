@@ -18,17 +18,10 @@ public class Auto extends LinearOpMode{
         private HuskyLens.Block tag;
         private int lastPos = 0;
         private long lastTime = 0;
+        private long startTime;
+        private double launchSpeed;
         static final int TICKS_PER_REV = 28; // REV HD Hex Motor
-        boolean QuietLaunch = false;
-        static final int goal_distance = 1;
-        static final int goal_y = 100;
-        static final double TAG_WIDTH_METERS = 0.165; // 16.5 cm
-        static final double FOCAL_LENGTH_PIXELS = 1212; // kalibreren!
-        static final double ANGLEMULT = 15; // kalibreren!
-        double angleRad;
-        double distance;
-        int DiaginalDistance;
-
+        int LaunchMode = 1;
             
                 
         public HuskyLens.Block getLargest(HuskyLens.Block[] blocks) {
@@ -61,34 +54,65 @@ public class Auto extends LinearOpMode{
         lastPos = currentPos;
         lastTime = currentTime;
     
-        if (deltaTime <= 0) return 50;
+        if (deltaTime <= 1) return 50;
     
         double ticksPerSecond = (deltaPos * 1000.0) / deltaTime;
         double rps = ticksPerSecond / TICKS_PER_REV;
         return rps * 60.0;
     }
-
+    
+    public boolean detectShootError(int MinSpeed, int MaxSpeed, double Speed) {
+        sleep(50);
+        if ((System.currentTimeMillis() > startTime + (LaunchMode == 0 ? 2500 : 500) && Speed == 0) || (System.currentTimeMillis() > startTime + (LaunchMode >= 2 ? 50000 : 5000))) {
+            motorLaunch.setPower(0);
+            telemetry.addData("Status", "Failed launch!");
+            if ((System.currentTimeMillis() > startTime + 5000)) {
+                telemetry.addData("Main reason", "Time-out");
+                telemetry.addData("Possible cause", "Battery low, please charge");
+            } else {
+                telemetry.addData("Main reason", "Flywheel is not rotating");
+                telemetry.addData("Possible cause", "Ball is stuck, please unstuck");
+            }
+            telemetry.addData("More info", "\n  Speed:                   %s RPM  \n  Start time:            %s ms   \n  Current time:         %s ms (%s)  \n  Min/Max:              %s, %s RPM", launchSpeed, startTime, System.currentTimeMillis(), (startTime - System.currentTimeMillis()), MinSpeed, MaxSpeed);
+            telemetry.update();
+            while (!(gamepad1.ps || gamepad2.ps) && opModeIsActive()) {
+                sleep(100);
+            }
+            return true;
+        }
+        return false;
+    }
 
     public void shoot(int MinSpeed, int MaxSpeed) {
+        startTime = System.currentTimeMillis();
         for (int i = 0; i <3; i++) {
-            motorLaunch.setPower(QuietLaunch ? 0.1 : 1); // speed up
-            double launchSpeed = 0; 
-            while (launchSpeed < (QuietLaunch ? 100 : MinSpeed) && opModeIsActive()) { // wait until: to speed
+            motorLaunch.setPower(LaunchMode == 0 ? 0.1 : 1); // speed up
+            launchSpeed = 20; 
+            while (launchSpeed < (MinSpeed) && opModeIsActive()) { // wait until: to speed
                 launchSpeed = getLaunchRPM();
-                sleep(100);
                 telemetry.addData("Status", "Speeding");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
+                if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
+                    return;
+                }
             }
-            while (launchSpeed > (QuietLaunch ? 100 : MaxSpeed) && opModeIsActive()) { // wait until: to speed
+            while (launchSpeed > (MaxSpeed) && opModeIsActive()) { // wait until: to speed
+                launchSpeed = getLaunchRPM();
                 motorLaunch.setPower(-0.05);
-                launchSpeed = getLaunchRPM();
-                sleep(100);
                 telemetry.addData("Status", "Speeding");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
+                if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
+                    return;
+                }
             }
-            motorLaunch.setPower(QuietLaunch ? 0.05 : 0.5);
+            
+            if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
+                    return;
+            }
+            
+            motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 0.5);
             telemetry.addData("Status", "ToSpeed");
             telemetry.update();
             motorIntake.setPower(-0.2);
@@ -99,9 +123,8 @@ public class Auto extends LinearOpMode{
             }
             ServoBall.setPosition(1);
             motorIntake.setPower(0);
-            }
-        
-        double launchSpeed = 150;
+        }
+        launchSpeed = 150;
         motorLaunch.setPower(-0.05);
         while (launchSpeed > 100 && opModeIsActive()) {
                 launchSpeed = getLaunchRPM();
@@ -110,33 +133,33 @@ public class Auto extends LinearOpMode{
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
             }
-        motorLaunch.setPower(0);
+        startTime = System.currentTimeMillis() - 500;
+        if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
+            return;
+        }
     }
     
-    public void correct(speed) {
+    public void correct() {
         boolean CorrectPos = false;
         while (!CorrectPos && opModeIsActive()) {
                 HuskyLens.Block[] blocks = husky.blocks();
                 HuskyLens.Block tag = getLargest(blocks);
                 telemetry.addData("tag", tag);
                 telemetry.update();
-                if (tag != null && (tag.id == 5 || tag.id == 4)) {
-                    DiaginalDistance = (TAG_WIDTH_METERS * FOCAL_LENGTH_PIXELS) / tag.width;
-                    angleRad = Math.toRadians(angle * ANGLEMULT);
-                    distance = DiaginalDistance * Math.cos(angleRad);   
-                    if (tag.y < goal_y - 20) {
-                        motorR.setPower(0.1 * speed);
-                        motorL.setPower(-0.1 * speed);
-                    } else if (tag.y > goal_y + 20) {
-                        motorR.setPower(-0.1 * speed);
-                        motorL.setPower(0.1 * speed);
+                if (tag != null) {
+                    if (tag.x > 130) {
+                        motorR.setPower(-0.2);
+                        motorL.setPower(-0.2);
+                    } else if (tag.x < 120) {
+                        motorR.setPower(0.5);
+                        motorL.setPower(0.5);
                     } else {
-                        if (distance > goal_distance + 0.1) {
-                            motorR.setPower(-0.2 * speed);
-                            motorL.setPower(-0.2 * speed);
-                        } else if (distance < goal_distance - 0.1) {
-                            motorR.setPower(0.5 * speed);
-                            motorL.setPower(0.5 * speed);
+                        if (tag.y < 80) {
+                            motorR.setPower(0.1);
+                            motorL.setPower(-0.1);
+                        } else if (tag.y > 120) {
+                            motorR.setPower(-0.1);
+                            motorL.setPower(0.1);
                         } else {
                             motorR.setPower(0);
                             motorL.setPower(0);
@@ -146,17 +169,6 @@ public class Auto extends LinearOpMode{
                 } else {
                     motorR.setPower(0);
                     motorL.setPower(0);
-                    if (angle >= 0.7) {
-                        angle = 0.3;
-                        motorR.setPower(-1);
-                        motorL.setPower(1);
-                        sleep(500);
-                        motorR.setPower(0);
-                        motorL.setPower(0);
-                    }
-                    ServoHusky.setPosition(angle);
-                    angle += 0.15;
-                    sleep(300);
                 }
         } 
     }
@@ -198,12 +210,7 @@ public class Auto extends LinearOpMode{
                 sleep(1000);
                 motorR.setPower(0);
                 motorL.setPower(0);
-                correct(1);
-                motorR.setPower(0);
-                motorL.setPower(0);
-                correct(0.5);
-                motorR.setPower(0);
-                motorL.setPower(0);
-                shoot();
+                correct();
+                shoot(1000, 1250);
         }
 }
