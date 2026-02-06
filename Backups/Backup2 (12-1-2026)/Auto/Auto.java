@@ -16,14 +16,10 @@ public class Auto extends LinearOpMode{
         private HuskyLens husky;
         private HuskyLens.Block[] blocks;
         private HuskyLens.Block tag;
-        private double goal_x = 90;
-        private double goal_y = 100;
-        private int GoalLossCount;
         private int lastPos = 0;
         private long lastTime = 0;
         private long startTime;
         private double launchSpeed;
-        private double angle = 0.7;
         static final int TICKS_PER_REV = 28; // REV HD Hex Motor
         int LaunchMode = 1;
             
@@ -119,7 +115,7 @@ public class Auto extends LinearOpMode{
             motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 0.5);
             telemetry.addData("Status", "ToSpeed");
             telemetry.update();
-            motorIntake.setPower(-1);
+            motorIntake.setPower(-0.2);
             sleep(200);
             if (i == 2) {
                 ServoBall.setPosition(0);
@@ -127,7 +123,6 @@ public class Auto extends LinearOpMode{
             }
             ServoBall.setPosition(1);
             motorIntake.setPower(0);
-            sleep(500);
         }
         launchSpeed = 150;
         motorLaunch.setPower(-0.05);
@@ -138,205 +133,44 @@ public class Auto extends LinearOpMode{
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
             }
-        motorLaunch.setPower(0);
-        if (launchSpeed == 0) {
-                motorLaunch.setPower(0);
-                telemetry.addData("Status", "Failed launch!");
-                telemetry.update();
-                sleep(3000);
-                return;
+        startTime = System.currentTimeMillis() - 500;
+        if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
+            return;
         }
     }
-    public HuskyLens.Block getLargest(HuskyLens.Block[] blocks, boolean elemination) {
-                if (blocks == null || blocks.length == 0) {
-                    return null; // geen blocks gezien
-                }
-        
-                HuskyLens.Block largest = null;
-                int largestSize = 0;
-        
-                for (int i = 0; i < blocks.length; i++) {
-                    int size = blocks[i].width * blocks[i].height;
-                    float proportion = blocks[i].width / (float)(blocks[i].height);
-                    //telemetry.addData("width", blocks[i].width);
-                    //telemetry.addData("height", blocks[i].height);
-                    //telemetry.addData("proportion", proportion);
-                    //telemetry.update();
-                    if (elemination ? (proportion < 1.4 && proportion > 0.6) : true) {
-                        if (size > largestSize && size > 20) {
-                            largest = blocks[i];
-                            largestSize = size;
-                        }
-                    }
-                }
-        
-                return largest;
-            }
     
-    public void correct(double speed, double distanceMult) {
-        double speedSt = 0.1;
-        husky.selectAlgorithm(HuskyLens.Algorithm.TAG_RECOGNITION);
-    
-        HuskyLens.Block[] blocks;
-        HuskyLens.Block tag = null;
-        HuskyLens.Block lastTag = null;
-    
+    public void correct() {
         boolean CorrectPos = false;
-    
         while (!CorrectPos && opModeIsActive()) {
-            blocks = husky.blocks();
-            tag = getLargest(blocks, false);
-    
-            if (tag != null) {
-                lastTag = tag;
-            }
-    
-            telemetry.addData("tag", tag);
-            telemetry.update();
-    
-            if (tag != null && (tag.id == 4 || tag.id == 5)) {
-    
-                GoalLossCount = 0;
-    
-                /* CAMERA CORRECTION PHASE */
-                if (angle < 0.7) {
-    
-                    motorR.setPower(0.5);
-                    motorL.setPower(0.5);
-                    sleep(450);
-                    motorR.setPower(0);
-                    motorL.setPower(0);
-    
-                    angle = Math.min(angle + 0.15, 0.7);
-                    ServoHusky.setPosition(angle);
-    
-                    sleep(50);
-    
-                    blocks = husky.blocks();
-                    tag = getLargest(blocks, false);
-    
-                    while (tag.x > 155 && tag.x < 165 &&
-                           angle < 0.7 &&
-                           opModeIsActive()) {
-                        blocks = husky.blocks();
-                        tag = getLargest(blocks, false);
-                        if (tag.x < 155) {
-                            angle += 0.05;
-                        } else if (tag.x > 165) {
-                            angle -= 0.05;
-                        }
-                        motorR.setPower(0);
-                        motorL.setPower(0);
-    
-                        angle = Math.max(0.4, Math.min(angle, 0.7));
-                        ServoHusky.setPosition(angle);
-                        
-                        if (tag != null){
-                            tag = getLargest(husky.blocks(), false);
-                            motorR.setPower(0);
-                            motorL.setPower(0);
+                HuskyLens.Block[] blocks = husky.blocks();
+                HuskyLens.Block tag = getLargest(blocks);
+                telemetry.addData("tag", tag);
+                telemetry.update();
+                if (tag != null) {
+                    if (tag.x > 130) {
+                        motorR.setPower(-0.2);
+                        motorL.setPower(-0.2);
+                    } else if (tag.x < 120) {
+                        motorR.setPower(0.5);
+                        motorL.setPower(0.5);
+                    } else {
+                        if (tag.y < 80) {
+                            motorR.setPower(0.1);
+                            motorL.setPower(-0.1);
+                        } else if (tag.y > 120) {
+                            motorR.setPower(-0.1);
+                            motorL.setPower(0.1);
                         } else {
-                            if (lastTag.x > 200) {
-                                motorR.setPower(-0.25 * speed);
-                                motorL.setPower(-0.25 * speed); 
-                            } else if (lastTag.x < 40) {
-                                motorR.setPower(0.25 * speed);
-                                motorL.setPower(0.25 * speed);
-                            } else if (lastTag.y < 40) {
-                                motorR.setPower(0.5 * speed);
-                                motorL.setPower(-0.5 * speed);
-                            } else if (lastTag.y > 180) {
-                                motorR.setPower(-0.5 * speed);
-                                motorL.setPower(0.5 * speed);
-                            } 
-                        }
-                    }
-    
-                }
-                /* POSITION CORRECTION PHASE */
-                else {
-    
-                    if (tag.x > goal_x + 5) {
-                        motorR.setPower(-0.5 * speed);
-                        motorL.setPower(-0.5 * speed);
-                    } 
-                    else if (tag.x < goal_x - 5) {
-                        motorR.setPower(0.5 * speed);
-                        motorL.setPower(0.5 * speed);
-                    } 
-                    else {
-                        if (tag.y > goal_y + 20) {
-                            motorR.setPower(-0.1 * speed);
-                            motorL.setPower(0.1 * speed);
-                        } 
-                        else if (tag.y < goal_y - 20) {
-                            motorR.setPower(0.1 * speed);
-                            motorL.setPower(-0.1 * speed);
-                        } 
-                        else {
                             motorR.setPower(0);
                             motorL.setPower(0);
                             CorrectPos = true;
                         }
                     }
-                }
-            }
-            /* TAG LOST */
-            else {
-    
-                GoalLossCount++;
-                telemetry.addData("GoalLossCount", GoalLossCount);
-                telemetry.addData("status", "Searching");
-                telemetry.addData("last", lastTag);
-                telemetry.update();
-                
-                if (lastTag == null) {
-                    if (angle >= 0.7) {
-                        motorR.setPower(speedSt * speed);
-                        motorL.setPower(-speedSt * speed);
-                        sleep(400);
-                        motorR.setPower(0);
-                        motorL.setPower(0);
-                    }
-                    ServoHusky.setPosition(angle);
-                    angle = Math.min(angle + 0.15, 0.7);
-                    sleep(450);
-                }
-                if (GoalLossCount > 20) {
-                    speedSt = 0.5;
                 } else {
-                    speedSt = 0.25;
-                }
-    
-                if (GoalLossCount >= 10 && lastTag != null) {
-    
                     motorR.setPower(0);
                     motorL.setPower(0);
-                    if (angle >= 0.7) {
-                        angle = 0.3;
-                        if (lastTag.x > 200) {
-                            motorR.setPower(-speedSt * speed);
-                            motorL.setPower(-speedSt * speed); 
-                        } else if (lastTag.y < 40) {
-                            motorR.setPower(speedSt * speed);
-                            motorL.setPower(-speedSt * speed);
-                        } else {
-                            motorR.setPower(-speedSt * speed);
-                            motorL.setPower(speedSt * speed);
-                        } 
-                        sleep(300);
-                        motorR.setPower(0);
-                        motorL.setPower(0);
-                    }
-    
-                    ServoHusky.setPosition(angle);
-                    angle = Math.min(angle + 0.15, 0.7);
-                    sleep(450);
                 }
-    
-                sleep(50);
-            }
-        }
+        } 
     }
         
         public void runOpMode() {
@@ -376,7 +210,7 @@ public class Auto extends LinearOpMode{
                 sleep(1000);
                 motorR.setPower(0);
                 motorL.setPower(0);
-                correct(1, 0);
-                shoot(900, 1050);
+                correct();
+                shoot(1000, 1250);
         }
 }
