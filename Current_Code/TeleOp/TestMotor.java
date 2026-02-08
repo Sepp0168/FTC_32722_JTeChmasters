@@ -112,18 +112,20 @@ public class TestMotor extends LinearOpMode {
         for (int i = 0; i <3; i++) {
             motorLaunch.setPower(LaunchMode == 0 ? 0.1 : 1); // speed up
             launchSpeed = 20; 
-            while (launchSpeed < (MinSpeed) && opModeIsActive()) { // wait until: to speed
+            launchSpeed = getLaunchRPM();
+            while (launchSpeed > (MaxSpeed) && opModeIsActive()) { // wait until: to speed
                 launchSpeed = getLaunchRPM();
-                telemetry.addData("Status", "Speeding");
+                motorLaunch.setPower(-0.05);
+                telemetry.addData("Status", "Slowing");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
                 if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
                     return;
                 }
             }
-            while (launchSpeed > (MaxSpeed) && opModeIsActive()) { // wait until: to speed
+            motorLaunch.setPower(LaunchMode == 0 ? 0.1 : 1);
+            while (launchSpeed < (MinSpeed) && opModeIsActive()) { // wait until: to speed
                 launchSpeed = getLaunchRPM();
-                motorLaunch.setPower(-0.05);
                 telemetry.addData("Status", "Speeding");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
@@ -136,7 +138,7 @@ public class TestMotor extends LinearOpMode {
                     return;
             }
             
-            motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 0.5);
+            motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 1);
             telemetry.addData("Status", "ToSpeed");
             telemetry.update();
             motorIntake.setPower(-1);
@@ -341,7 +343,7 @@ public class TestMotor extends LinearOpMode {
                 if (LaunchMode == 0) {
                     shoot(500, 750);
                 } else if (LaunchMode == 1) {
-                    shoot(750, 1000);
+                    shoot(950, 1050);
                 } else if (LaunchMode == 2) {
                     shoot(1000, 1250);
                 } else if (LaunchMode == 3) {
