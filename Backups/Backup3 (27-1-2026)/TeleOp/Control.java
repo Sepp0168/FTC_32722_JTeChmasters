@@ -112,20 +112,18 @@ public class TestMotor extends LinearOpMode {
         for (int i = 0; i <3; i++) {
             motorLaunch.setPower(LaunchMode == 0 ? 0.1 : 1); // speed up
             launchSpeed = 20; 
-            launchSpeed = getLaunchRPM();
-            while (launchSpeed > (MaxSpeed) && opModeIsActive()) { // wait until: to speed
+            while (launchSpeed < (MinSpeed) && opModeIsActive()) { // wait until: to speed
                 launchSpeed = getLaunchRPM();
-                motorLaunch.setPower(-0.05);
-                telemetry.addData("Status", "Slowing");
+                telemetry.addData("Status", "Speeding");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
                 if (detectShootError(MinSpeed, MaxSpeed, launchSpeed)) {
                     return;
                 }
             }
-            motorLaunch.setPower(LaunchMode == 0 ? 0.1 : 1);
-            while (launchSpeed < (MinSpeed) && opModeIsActive()) { // wait until: to speed
+            while (launchSpeed > (MaxSpeed) && opModeIsActive()) { // wait until: to speed
                 launchSpeed = getLaunchRPM();
+                motorLaunch.setPower(-0.05);
                 telemetry.addData("Status", "Speeding");
                 telemetry.addData("RMP", launchSpeed);
                 telemetry.update();
@@ -138,10 +136,10 @@ public class TestMotor extends LinearOpMode {
                     return;
             }
             
-            motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 1);
+            motorLaunch.setPower(LaunchMode == 0 ? 0.075 : 0.5);
             telemetry.addData("Status", "ToSpeed");
             telemetry.update();
-            motorIntake.setPower(-1);
+            motorIntake.setPower(-0.2);
             Wait(200);
             if (i == 2) {
                 ServoBall.setPosition(0);
@@ -149,7 +147,6 @@ public class TestMotor extends LinearOpMode {
             }
             ServoBall.setPosition(1);
             motorIntake.setPower(0);
-            sleep(500);
         }
         launchSpeed = 150;
         motorLaunch.setPower(-0.05);
@@ -343,7 +340,7 @@ public class TestMotor extends LinearOpMode {
                 if (LaunchMode == 0) {
                     shoot(500, 750);
                 } else if (LaunchMode == 1) {
-                    shoot(950, 1050);
+                    shoot(750, 1000);
                 } else if (LaunchMode == 2) {
                     shoot(1000, 1250);
                 } else if (LaunchMode == 3) {
