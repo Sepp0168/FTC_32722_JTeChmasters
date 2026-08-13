@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.robot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.teamcode.robot.subsystems.Arm;
 import org.firstinspires.ftc.teamcode.robot.subsystems.Drive;
-import org.firstinspires.ftc.teamcode.robot.subsystems.Intake;
 
 /**
  * Central access point for every robot subsystem.
@@ -15,7 +14,6 @@ public class RobotHardware {
 
     public Arm arm;
     public Drive drive;
-    public Intake intake;
 
     public RobotHardware(LinearOpMode opMode) {
         this.opMode = opMode;
@@ -24,12 +22,10 @@ public class RobotHardware {
     public void init() {
         arm = new Arm(opMode.hardwareMap);
         drive = new Drive(opMode.hardwareMap);
-        intake = new Intake(opMode.hardwareMap);
     }
 
     public void updateAll() {
         arm.update();
         drive.update();
-        intake.update();
     }
 }
