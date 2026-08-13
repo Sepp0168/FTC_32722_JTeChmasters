@@ -4,16 +4,14 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.teamcode.robot.RobotHardware;
 
-@TeleOp(name = "Main")
-public class Main extends LinearOpMode {
+@TeleOp(name = "Test")
+public class Test extends LinearOpMode {
     RobotHardware robot = new RobotHardware(this);
 
     @Override
     public void runOpMode() {
         robot.init();
         waitForStart();
-
-        boolean isANoobcom = false;
 
         while (opModeIsActive()) {
             // TODO: driver-controlled logic
