@@ -20,15 +20,15 @@ public class DriverControlled extends LinearOpMode {
     @Override
     public void runOpMode() {
         robot.init();
-
-
+        // TODO: add any additional initialization logic here
         waitForStart();
-
-        boolean helloThereImSeppieweppie;
 
         while (opModeIsActive()) {
             // TODO: driver-controlled logic
             robot.updateAll();
+            if (gamepad1.a) {
+                // do nothing
+            }
         }
     }
 }

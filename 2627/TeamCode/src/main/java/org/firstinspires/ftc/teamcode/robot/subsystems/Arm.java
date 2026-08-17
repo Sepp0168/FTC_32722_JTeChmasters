@@ -15,11 +15,11 @@ import org.firstinspires.ftc.teamcode.config.RobotConstants;
 public class Arm {
 
     public Arm(HardwareMap hardwareMap) {
-        // TODO: map motors, servos, and sensors here
+        // TODO: map motors, servos, and sensors here, because it needs to be
     }
 
     /** Call this once per loop from the OpMode, if needed. */
     public void update() {
-        // TODO: continuous control logic
+        // TODO: continuous control logic, because
     }
 }
