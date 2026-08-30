@@ -85,7 +85,7 @@ public class TelemetryServer {
 
     /** Implement this in a subsystem to receive live PID pushes from the PID Tuner tab. */
     public interface PidListener {
-        void onPidUpdate(double p, double i, double d, double f);
+        void onPidUpdate(double proportional, double integral, double derivative, double feedforward);
     }
 
     /** Registers the callback invoked whenever the PID Tuner tab pushes new P/I/D/F values. */
@@ -101,7 +101,7 @@ public class TelemetryServer {
         startTimeMillis = System.currentTimeMillis();
         try {
             serverSocket = new ServerSocket(port);
-        } catch (IOException e) {
+        } catch (IOException bindFailure) {
             return; // port busy or unavailable -- fail silently, this is a debug tool
         }
         running = true;
@@ -127,7 +127,7 @@ public class TelemetryServer {
             try {
                 Socket client = serverSocket.accept();
                 handleClient(client);
-            } catch (IOException e) {
+            } catch (IOException acceptFailure) {
                 if (running) {
                     // socket error while still supposed to be running -- just keep looping
                 }
@@ -136,21 +136,21 @@ public class TelemetryServer {
     }
 
     private void handleClient(Socket client) {
-        try (client;
-             BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
-             OutputStream out = client.getOutputStream()) {
+        try (Socket socket = client;
+             BufferedReader requestReader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+             OutputStream out = socket.getOutputStream()) {
 
-            String requestLine = in.readLine();
+            String requestLine = requestReader.readLine();
             if (requestLine == null) return;
             String method = parseMethod(requestLine);
             String path = parsePath(requestLine);
 
             int contentLength = 0;
-            String line;
-            while ((line = in.readLine()) != null && !line.isEmpty()) {
-                if (line.toLowerCase(java.util.Locale.ROOT).startsWith("content-length:")) {
+            String headerLine;
+            while ((headerLine = requestReader.readLine()) != null && !headerLine.isEmpty()) {
+                if (headerLine.toLowerCase(java.util.Locale.ROOT).startsWith("content-length:")) {
                     try {
-                        contentLength = Integer.parseInt(line.substring(line.indexOf(':') + 1).trim());
+                        contentLength = Integer.parseInt(headerLine.substring(headerLine.indexOf(':') + 1).trim());
                     } catch (NumberFormatException ignored) {
                     }
                 }
@@ -159,13 +159,13 @@ public class TelemetryServer {
             String requestBody = "";
             if (contentLength > 0) {
                 char[] buf = new char[contentLength];
-                int read = 0;
-                while (read < contentLength) {
-                    int n = in.read(buf, read, contentLength - read);
-                    if (n < 0) break;
-                    read += n;
+                int totalRead = 0;
+                while (totalRead < contentLength) {
+                    int bytesRead = requestReader.read(buf, totalRead, contentLength - totalRead);
+                    if (bytesRead < 0) break;
+                    totalRead += bytesRead;
                 }
-                requestBody = new String(buf, 0, read);
+                requestBody = new String(buf, 0, totalRead);
             }
 
             byte[] body;
@@ -188,7 +188,7 @@ public class TelemetryServer {
                             pidJson.optDouble("d", 0),
                             pidJson.optDouble("f", 0)
                         );
-                    } catch (Exception e) {
+                    } catch (Exception malformedPidPayload) {
                         statusCode = 400;
                     }
                 }
@@ -267,14 +267,14 @@ public class TelemetryServer {
             json.put("gamepads", gpadObj);
 
             org.json.JSONArray pathArr = new org.json.JSONArray();
-            for (JSONObject pt : pathPoints) {
-                pathArr.put(pt);
+            for (JSONObject waypoint : pathPoints) {
+                pathArr.put(waypoint);
             }
             json.put("pathPoints", pathArr);
 
             org.json.JSONArray targetArr = new org.json.JSONArray();
-            for (JSONObject tg : targets) {
-                targetArr.put(tg);
+            for (JSONObject targetMarker : targets) {
+                targetArr.put(targetMarker);
             }
             json.put("targets", targetArr);
 
@@ -337,22 +337,23 @@ public class TelemetryServer {
         } catch (Exception ignored) {}
     }
 
-    public void setGamepadState(String gamepadId, double lx, double ly, double rx, double ry, boolean a, boolean b, boolean x, boolean y) {
+    public void setGamepadState(String gamepadId, double leftStickX, double leftStickY, double rightStickX, double rightStickY,
+                                 boolean aPressed, boolean bPressed, boolean xPressed, boolean yPressed) {
         try {
             JSONObject obj = new JSONObject();
-            obj.put("lx", lx); obj.put("ly", ly);
-            obj.put("rx", rx); obj.put("ry", ry);
-            obj.put("a", a); obj.put("b", b);
-            obj.put("x", x); obj.put("y", y);
+            obj.put("lx", leftStickX); obj.put("ly", leftStickY);
+            obj.put("rx", rightStickX); obj.put("ry", rightStickY);
+            obj.put("a", aPressed); obj.put("b", bPressed);
+            obj.put("x", xPressed); obj.put("y", yPressed);
             gamepads.put(gamepadId, obj);
         } catch (Exception ignored) {}
     }
 
     public void addPathWaypoint(double x, double y) {
         try {
-            JSONObject pt = new JSONObject();
-            pt.put("x", x); pt.put("y", y);
-            pathPoints.add(pt);
+            JSONObject waypoint = new JSONObject();
+            waypoint.put("x", x); waypoint.put("y", y);
+            pathPoints.add(waypoint);
         } catch (Exception ignored) {}
     }
 
@@ -362,12 +363,12 @@ public class TelemetryServer {
 
     public void addTargetMarker(String label, double x, double y, String type) {
         try {
-            JSONObject tg = new JSONObject();
-            tg.put("label", label);
-            tg.put("x", x);
-            tg.put("y", y);
-            tg.put("type", type == null ? "target" : type);
-            targets.add(tg);
+            JSONObject targetMarker = new JSONObject();
+            targetMarker.put("label", label);
+            targetMarker.put("x", x);
+            targetMarker.put("y", y);
+            targetMarker.put("type", type == null ? "target" : type);
+            targets.add(targetMarker);
         } catch (Exception ignored) {}
     }
 
