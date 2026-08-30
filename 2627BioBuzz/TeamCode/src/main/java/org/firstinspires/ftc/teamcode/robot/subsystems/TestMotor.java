@@ -2,7 +2,7 @@ package org.firstinspires.ftc.teamcode.robot.subsystems;
 
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import org.firstinspires.ftc.teamcode.config.RobotConstants;
+import org.firstinspires.ftc.teamcode.config.HardwareNames;
 
 /**
  * TestMotor subsystem.
@@ -18,7 +18,7 @@ public class TestMotor {
     private DcMotor testMotor;
 
     public TestMotor(HardwareMap hardwareMap) {
-        testMotor = hardwareMap.get(DcMotor.class, RobotConstants.TEST_MOTOR_NAME);
+        testMotor = hardwareMap.get(DcMotor.class, RobotConstants.TEST_MOTOR);
     }
 
     public void forward() {

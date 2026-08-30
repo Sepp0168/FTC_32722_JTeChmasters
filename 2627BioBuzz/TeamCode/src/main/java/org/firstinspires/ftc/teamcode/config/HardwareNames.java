@@ -11,5 +11,5 @@ package org.firstinspires.ftc.teamcode.config;
 public final class HardwareNames {
     private HardwareNames() { }
 
-    // No devices configured yet -- add some in the Hardware Map Editor.
+    public static final String TEST_MOTOR = "testMotor"; // DcMotor, Control Hub, Port 0
 }

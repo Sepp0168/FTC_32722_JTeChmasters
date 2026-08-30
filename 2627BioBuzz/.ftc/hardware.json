@@ -1,0 +1,10 @@
+{
+  "devices": [
+    {
+      "name": "testMotor",
+      "type": "DcMotor",
+      "port": "Control Hub, Port 0",
+      "direction": ""
+    }
+  ]
+}
