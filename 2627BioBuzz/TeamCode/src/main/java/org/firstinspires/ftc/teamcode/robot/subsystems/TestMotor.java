@@ -4,6 +4,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.teamcode.config.HardwareNames;
 import org.firstinspires.ftc.teamcode.robot.debug.TelemetryServer;
+import org.firstinspires.ftc.teamcode.util.MotorUtills;
+import org.firstinspires.ftc.teamcode.util.PIDController;
 
 /**
  * TestMotor subsystem.
@@ -18,12 +20,17 @@ public class TestMotor {
 
     private DcMotor testMotor;
 
+    PIDController motorPID = new PIDController(0.005, 0.0, 0.0002, 0.0);
+
+    private final MotorUtills motorUtils = new MotorUtills();
+
     public TestMotor(HardwareMap hardwareMap) {
         testMotor = hardwareMap.get(DcMotor.class, HardwareNames.TEST_MOTOR);
     }
 
     public void forward() {
-        testMotor.setPower(1);
+        float motorSpeed = motorUtils.getMotorVelocityTicksPerSec(testMotor);
+        testMotor.setPower(motorPID.calculate(336000, motorSpeed));
     }
 
     public void stop() {
@@ -32,6 +39,8 @@ public class TestMotor {
 
     /** Call this once per loop from the OpMode, if needed. */
     public void update() {
-        // TODO: continuous control logic
+        TelemetryServer.getInstance().setPidListener((p, i, d, f) -> {
+            motorPID.setPIDF(p, i, d, f);
+    });
     }
 }
