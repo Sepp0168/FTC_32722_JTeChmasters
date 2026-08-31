@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.robot.subsystems;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.teamcode.config.HardwareNames;
+import org.firstinspires.ftc.teamcode.robot.debug.TelemetryServer;
 
 /**
  * TestMotor subsystem.
@@ -22,7 +23,7 @@ public class TestMotor {
     }
 
     public void forward() {
-        testMotor.setPower(0.1);
+        testMotor.setPower(1);
     }
 
     public void stop() {
