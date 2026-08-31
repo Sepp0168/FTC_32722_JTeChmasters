@@ -14,7 +14,7 @@ public class DriverControlled extends LinearOpMode {
     @Override
     public void runOpMode() {
         robot.init();
-        TelemetryServer.getInstance().start(8080);
+        TelemetryServer.getInstance().start(8000);
         TelemetryServer.getInstance().setOpModeName(robot.getClass().getSimpleName());
         TelemetryServer.getInstance().setCurrentTask("Waiting for start");
         // TODO: add any additional initialization logic here

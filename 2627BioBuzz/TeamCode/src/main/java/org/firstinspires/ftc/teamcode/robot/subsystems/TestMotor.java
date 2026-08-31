@@ -18,7 +18,7 @@ public class TestMotor {
     private DcMotor testMotor;
 
     public TestMotor(HardwareMap hardwareMap) {
-        testMotor = hardwareMap.get(DcMotor.class, RobotConstants.TEST_MOTOR);
+        testMotor = hardwareMap.get(DcMotor.class, HardwareNames.TEST_MOTOR);
     }
 
     public void forward() {
