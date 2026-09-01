@@ -66,6 +66,8 @@ public class TelemetryServer {
     // ---- Live state, updated by robot code, read by the HTTP handler ----
     private volatile String opModeName = "";
     private volatile String currentTask = "";
+    private volatile String robotState = "waiting";
+    private volatile boolean isStarted = false;
     private volatile double positionX = 0;
     private volatile double positionY = 0;
     private volatile double headingDegrees = 0;
@@ -238,6 +240,8 @@ public class TelemetryServer {
         try {
             json.put("opModeName", opModeName.isEmpty() ? "Idle" : opModeName);
             json.put("currentTask", currentTask.isEmpty() ? "Ready" : currentTask);
+            json.put("robotState", robotState);
+            json.put("isStarted", isStarted);
             json.put("batteryVoltage", batteryVoltage);
             json.put("runtimeSeconds", runtimeSeconds > 0 ? runtimeSeconds : (System.currentTimeMillis() - startTimeMillis) / 1000.0);
 
@@ -298,6 +302,18 @@ public class TelemetryServer {
 
     public void setOpModeName(String name) {
         this.opModeName = name == null ? "" : name;
+        if (!isStarted && !this.opModeName.isEmpty()) {
+            this.robotState = "waiting";
+        }
+    }
+
+    public void setStarted(boolean started) {
+        this.isStarted = started;
+        this.robotState = started ? "running" : "waiting";
+    }
+
+    public void setRobotState(String state) {
+        this.robotState = state == null ? "waiting" : state;
     }
 
     public void setCurrentTask(String task) {
