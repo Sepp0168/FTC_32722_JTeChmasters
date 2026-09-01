@@ -20,6 +20,8 @@ public class RobotHardware {
 
     public void init() {
         testMotor = new TestMotor(opMode.hardwareMap);
+        TelemetryServer.getInstance().start(8000);
+        TelemetryServer.getInstance().setOpModeName(opMode.getClass().getSimpleName());
     }
 
     public void updateAll() {

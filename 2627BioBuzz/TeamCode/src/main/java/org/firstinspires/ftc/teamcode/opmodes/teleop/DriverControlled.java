@@ -4,8 +4,9 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.teamcode.robot.RobotHardware;
 import org.firstinspires.ftc.teamcode.robot.debug.TelemetryServer;
+
+import org.firstinspires.ftc.teamcode.robot.RobotHardware;
 
 @TeleOp(name = "Driver Controlled")
 public class DriverControlled extends LinearOpMode {
@@ -22,10 +23,6 @@ public class DriverControlled extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        TelemetryServer.getInstance().start(8000);
-        TelemetryServer.getInstance().setOpModeName(this.getClass().getSimpleName());
-        TelemetryServer.getInstance().setCurrentTask("Waiting for start");
-
         robot.init();
 
         telemetry.addData("Status", "Initialized");
