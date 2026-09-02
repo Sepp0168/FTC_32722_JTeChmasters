@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Start it once, e.g. from RobotHardware.init():
  *
- *     TelemetryServer.getInstance().start(8080);
+ *     TelemetryServer.getInstance().start(8000);
  *
  * Update it from anywhere in your code as state changes:
  *
@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *     TelemetryServer.getInstance().setCurrentTask("Driving to scoring position");
  *     TelemetryServer.getInstance().setNextPathPoint(24.0, 36.0);
  *     TelemetryServer.getInstance().setVariable("armAngle", arm.getCurrentAngle());
+ *     TelemetryServer.getInstance().setPidGraph(45.0, arm.getCurrentAngle());
  *
  * Stop it when the OpMode ends (optional -- a fresh start() call also
  * safely replaces a running server):
@@ -79,6 +80,11 @@ public class TelemetryServer {
     private final Map<String, Object> variables = new ConcurrentHashMap<>();
     private final Map<String, JSONObject> motors = new ConcurrentHashMap<>();
     private final Map<String, JSONObject> gamepads = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Object>> subsystemsTelemetry = new ConcurrentHashMap<>();
+    private volatile String pidTargetSubsystem = "";
+    private volatile Double pidSetpoint = null;
+    private volatile Double pidGraphTarget = null;
+    private volatile Double pidGraphActual = null;
     private final java.util.List<JSONObject> pathPoints = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final java.util.List<JSONObject> targets = new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile JSONObject lastException = null;
@@ -88,6 +94,23 @@ public class TelemetryServer {
     /** Implement this in a subsystem to receive live PID pushes from the PID Tuner tab. */
     public interface PidListener {
         void onPidUpdate(double proportional, double integral, double derivative, double feedforward);
+    }
+
+    /**
+     * Implement this (in addition to, or instead of, {@link PidListener}) when you have
+     * multiple subsystems and want the PID Tuner's target-subsystem selector to route
+     * updates to the correct one, and to receive the setpoint alongside P/I/D/F.
+     */
+    public interface TargetedPidListener {
+        void onPidUpdate(String targetSubsystem, double proportional, double integral, double derivative,
+                          double feedforward, Double setpoint);
+    }
+
+    private volatile TargetedPidListener targetedPidListener = null;
+
+    /** Registers a callback that also receives the target subsystem name and setpoint. */
+    public void setTargetedPidListener(TargetedPidListener listener) {
+        this.targetedPidListener = listener;
     }
 
     /** Registers the callback invoked whenever the PID Tuner tab pushes new P/I/D/F values. */
@@ -178,21 +201,32 @@ public class TelemetryServer {
                 body = buildSnapshot().toString().getBytes(StandardCharsets.UTF_8);
                 contentType = "application/json";
             } else if ("/pid".equals(path) && "POST".equals(method)) {
-                // Body: {"p":..,"i":..,"d":..,"f":..,"name":".."} pushed live from
-                // the PID Tuner tab. Forward it to whatever the robot code
-                // registered via setPidListener(...); no-op if nothing's listening.
-                if (pidListener != null) {
-                    try {
-                        JSONObject pidJson = new JSONObject(requestBody);
-                        pidListener.onPidUpdate(
-                            pidJson.optDouble("p", 0),
-                            pidJson.optDouble("i", 0),
-                            pidJson.optDouble("d", 0),
-                            pidJson.optDouble("f", 0)
-                        );
-                    } catch (Exception malformedPidPayload) {
-                        statusCode = 400;
+                // Body: {"p":..,"i":..,"d":..,"f":..,"target":"..","setpoint":..} pushed
+                // live from the PID Tuner tab. "target" is the subsystem name chosen in
+                // the tuner's target selector and "setpoint" is the slider value; both
+                // are optional so older payloads without them still work. Forwarded to
+                // whatever the robot code registered via setPidListener(...) and/or
+                // setTargetedPidListener(...); no-op if nothing's listening.
+                try {
+                    JSONObject pidJson = new JSONObject(requestBody);
+                    double p = pidJson.optDouble("p", 0);
+                    double i = pidJson.optDouble("i", 0);
+                    double d = pidJson.optDouble("d", 0);
+                    double f = pidJson.optDouble("f", 0);
+                    String target = pidJson.optString("target", "");
+                    Double setpoint = pidJson.has("setpoint") ? pidJson.optDouble("setpoint") : null;
+
+                    this.pidTargetSubsystem = target;
+                    this.pidSetpoint = setpoint;
+
+                    if (pidListener != null) {
+                        pidListener.onPidUpdate(p, i, d, f);
                     }
+                    if (targetedPidListener != null) {
+                        targetedPidListener.onPidUpdate(target, p, i, d, f, setpoint);
+                    }
+                } catch (Exception malformedPidPayload) {
+                    statusCode = 400;
                 }
                 body = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
                 contentType = "application/json";
@@ -270,6 +304,29 @@ public class TelemetryServer {
             }
             json.put("gamepads", gpadObj);
 
+            JSONObject subsystemsObj = new JSONObject();
+            for (Map.Entry<String, Map<String, Object>> subsystemEntry : subsystemsTelemetry.entrySet()) {
+                JSONObject subsystemData = new JSONObject();
+                for (Map.Entry<String, Object> field : subsystemEntry.getValue().entrySet()) {
+                    subsystemData.put(field.getKey(), field.getValue());
+                }
+                subsystemsObj.put(subsystemEntry.getKey(), subsystemData);
+            }
+            json.put("subsystems", subsystemsObj);
+
+            if (!pidTargetSubsystem.isEmpty() || pidSetpoint != null) {
+                JSONObject pidState = new JSONObject();
+                pidState.put("target", pidTargetSubsystem);
+                if (pidSetpoint != null) {
+                    pidState.put("setpoint", pidSetpoint);
+                }
+                json.put("pidState", pidState);
+            }
+            if (pidGraphTarget != null && pidGraphActual != null) {
+                json.put("pidTarget", pidGraphTarget);
+                json.put("pidActual", pidGraphActual);
+            }
+
             org.json.JSONArray pathArr = new org.json.JSONArray();
             for (JSONObject waypoint : pathPoints) {
                 pathArr.put(waypoint);
@@ -328,6 +385,22 @@ public class TelemetryServer {
         this.runtimeSeconds = seconds;
     }
 
+    /**
+     * Feeds the PID / PIDF Tuner graph. Call this once per loop from the
+     * subsystem being tuned, using the same units for both values (degrees,
+     * encoder ticks, inches, etc.).
+     */
+    public void setPidGraph(double target, double actual) {
+        this.pidGraphTarget = target;
+        this.pidGraphActual = actual;
+    }
+
+    /** Clears the PID graph feed so the dashboard falls back to its placeholder graph. */
+    public void clearPidGraph() {
+        this.pidGraphTarget = null;
+        this.pidGraphActual = null;
+    }
+
     public void setPosition(double x, double y, double headingDegrees) {
         this.positionX = x;
         this.positionY = y;
@@ -363,6 +436,68 @@ public class TelemetryServer {
             obj.put("x", xPressed); obj.put("y", yPressed);
             gamepads.put(gamepadId, obj);
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Convenience overload that logs a full FTC SDK {@code Gamepad} object in one call --
+     * both sticks, both triggers, both bumpers, and every face/system button -- instead of
+     * having to pull each field out by hand. Safe to call every loop; intended to be wired
+     * up automatically in {@code RobotHardware.updateAll()} for gamepad1/gamepad2.
+     */
+    public void setGamepadState(String gamepadId, com.qualcomm.robotcore.hardware.Gamepad gamepad) {
+        if (gamepad == null) return;
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("lx", gamepad.left_stick_x);
+            obj.put("ly", gamepad.left_stick_y);
+            obj.put("rx", gamepad.right_stick_x);
+            obj.put("ry", gamepad.right_stick_y);
+            obj.put("leftTrigger", gamepad.left_trigger);
+            obj.put("rightTrigger", gamepad.right_trigger);
+            obj.put("leftBumper", gamepad.left_bumper);
+            obj.put("rightBumper", gamepad.right_bumper);
+            obj.put("a", gamepad.a);
+            obj.put("b", gamepad.b);
+            obj.put("x", gamepad.x);
+            obj.put("y", gamepad.y);
+            obj.put("dpadUp", gamepad.dpad_up);
+            obj.put("dpadDown", gamepad.dpad_down);
+            obj.put("dpadLeft", gamepad.dpad_left);
+            obj.put("dpadRight", gamepad.dpad_right);
+            obj.put("leftStickButton", gamepad.left_stick_button);
+            obj.put("rightStickButton", gamepad.right_stick_button);
+            obj.put("start", gamepad.start);
+            obj.put("back", gamepad.back);
+            obj.put("guide", gamepad.guide);
+            gamepads.put(gamepadId, obj);
+        } catch (Exception ignored) {}
+    }
+
+    /** Sets a single named telemetry field for a subsystem (e.g. "Lift", "current", 3.2). */
+    public void setSubsystemTelemetry(String subsystem, String key, Object value) {
+        if (subsystem == null || key == null) return;
+        subsystemsTelemetry
+            .computeIfAbsent(subsystem, s -> new ConcurrentHashMap<>())
+            .put(key, value);
+    }
+
+    /** Replaces/merges a whole batch of telemetry fields for a subsystem at once. */
+    public void setSubsystemTelemetry(String subsystem, Map<String, Object> data) {
+        if (subsystem == null || data == null) return;
+        subsystemsTelemetry
+            .computeIfAbsent(subsystem, s -> new ConcurrentHashMap<>())
+            .putAll(data);
+    }
+
+    /** Clears all telemetry previously reported for one subsystem. */
+    public void clearSubsystemTelemetry(String subsystem) {
+        if (subsystem == null) return;
+        subsystemsTelemetry.remove(subsystem);
+    }
+
+    /** Clears telemetry for every subsystem. */
+    public void clearAllSubsystemTelemetry() {
+        subsystemsTelemetry.clear();
     }
 
     public void addPathWaypoint(double x, double y) {
