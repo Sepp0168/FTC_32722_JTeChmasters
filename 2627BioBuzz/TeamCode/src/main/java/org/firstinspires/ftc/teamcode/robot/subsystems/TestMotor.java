@@ -19,7 +19,7 @@ public class TestMotor {
     public static final double DEFAULT_TARGET_VELOCITY = 2000.0; // Ticks per second
 
     private final DcMotor testMotor;
-    private final PIDController motorPID = new PIDController(0.0005, 0.0001, 0.00005, 0.0003);
+    private final PIDController motorPID = new PIDController(0.01, 0.5, 0.001, 0.05);
     private final MotorUtils motorUtils = new MotorUtils();
 
     private double targetVelocity = 0.0;
